@@ -8,6 +8,7 @@ from google.oauth2.service_account import Credentials
 from openai import OpenAI
 import os
 from datetime import datetime, timezone
+import time
 
 client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
 
