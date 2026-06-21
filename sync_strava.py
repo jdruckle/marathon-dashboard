@@ -34,19 +34,29 @@ def get_access_token():
 # STRAVA ACTIVITIES
 # =========================
 
-def fetch_activities(token, per_page=50):
+def fetch_all_activities(token, max_pages=10):
     url = "https://www.strava.com/api/v3/athlete/activities"
-
     headers = {"Authorization": f"Bearer {token}"}
 
-    params = {
-        "per_page": per_page,
-        "page": 1
-    }
+    all_activities = []
 
-    res = requests.get(url, headers=headers, params=params)
-    res.raise_for_status()
-    return res.json()
+    for page in range(1, max_pages + 1):
+        params = {
+            "per_page": 200,
+            "page": page
+        }
+
+        res = requests.get(url, headers=headers, params=params)
+        res.raise_for_status()
+
+        batch = res.json()
+
+        if not batch:
+            break
+
+        all_activities.extend(batch)
+
+    return all_activities
 
 
 # =========================
@@ -78,7 +88,7 @@ def main():
     print("Starting sync...")
 
     token = get_access_token()
-    activities = fetch_activities(token)
+    activities = fetch_all_activities(token)
 
     sheet = connect_sheet()
 
