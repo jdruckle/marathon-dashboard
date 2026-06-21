@@ -62,7 +62,10 @@ def get_access_token():
     res = requests.post(url, data=payload)
 
     if res.status_code != 200:
-        print("STRAVA ERROR RESPONSE:", res.text)
+        print("ERROR RESPONSE")
+        print("STATUS:", res.status_code)
+        print("HEADERS:", res.headers)
+        print("BODY:", res.text[:500])
 
     res.raise_for_status()
     return res.json()["access_token"]
