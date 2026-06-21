@@ -96,6 +96,12 @@ def fetch_all_activities(token, after_timestamp=None):
         while True:
             res = requests.get(base_url, headers=headers, params=params)
 
+            print("Status:", res.status_code)
+            print("Headers:")
+            for k, v in res.headers.items():
+                if "rate" in k.lower():
+                    print(f"  {k}: {v}")
+
             if res.status_code == 429:
                 retry_count += 1
 
@@ -105,12 +111,6 @@ def fetch_all_activities(token, after_timestamp=None):
                 continue
 
             break
-
-        print("Status:", res.status_code)
-        print("Headers:")
-        for k, v in res.headers.items():
-            if "rate" in k.lower():
-                print(f"  {k}: {v}")
         
         print("Response body:")
         print(res.text[:1000])
