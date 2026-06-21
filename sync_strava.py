@@ -81,8 +81,9 @@ def fetch_all_activities(token, after_timestamp=None):
     page = 1
     all_activities = []
 
-    params_base = {"per_page": 200}
+    base_url = "https://www.strava.com/api/v3/athlete/activities"
 
+    params_base = {"per_page": 200}
     if after_timestamp:
         params_base["after"] = after_timestamp
 
@@ -90,17 +91,20 @@ def fetch_all_activities(token, after_timestamp=None):
         params = dict(params_base)
         params["page"] = page
 
-        res = requests.get(
-            "https://www.strava.com/api/v3/athlete/activities",
-            headers=headers,
-            params=params
-        )
+        retry_count = 0
 
-        # handle rate limit
-        #if res.status_code == 429:
-        #    print("Rate limited. Sleeping 2s...")
-        #    time.sleep(2)
-        #    continue
+        while True:
+            res = requests.get(base_url, headers=headers, params=params)
+
+            if res.status_code == 429:
+                retry_count += 1
+
+                wait_time = min(60 * retry_count, 300)  # cap at 5 min
+                print(f"Rate limited. Sleeping {wait_time}s (retry {retry_count})...")
+                time.sleep(wait_time)
+                continue
+
+            break
 
         res.raise_for_status()
 
@@ -111,9 +115,17 @@ def fetch_all_activities(token, after_timestamp=None):
 
         all_activities.extend(data)
 
+        print(f"Fetched page {page}, got {len(data)} activities")
+
         page += 1
 
-        time.sleep(1.2)  # prevent burst limits
+        # throttle between successful calls
+        time.sleep(2.0)
+
+        # prevents runaway loops
+        if page > 20:
+            print("Safety cap reached (20 pages). Stopping early.")
+            break
 
     return all_activities
 
