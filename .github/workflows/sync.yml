@@ -24,3 +24,4 @@ jobs:
           STRAVA_CLIENT_SECRET: ${{ secrets.STRAVA_CLIENT_SECRET }}
           STRAVA_REFRESH_TOKEN: ${{ secrets.STRAVA_REFRESH_TOKEN }}
           GOOGLE_CREDS: ${{ secrets.GOOGLE_CREDS }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
