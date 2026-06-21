@@ -108,8 +108,8 @@ def main():
         ])
 
     # Append rows
-    for row in rows:
-        raw_ws.append_row(row)
+    if rows:
+        raw_ws.append_rows(rows, value_input_option="RAW")
 
     print(f"Uploaded {len(rows)} activities")
 
