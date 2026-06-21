@@ -5,6 +5,10 @@ import json
 from datetime import datetime
 import gspread
 from google.oauth2.service_account import Credentials
+from openai import OpenAI
+import os
+
+client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
 
 # =========================
 # HEADER VARIABLES
@@ -167,6 +171,75 @@ def classify_workout(laps):
     return "Mixed / Fartlek"
 
 # =========================
+# AI FUNCTIONS
+# =========================
+
+def build_ai_context(runs, laps, pace_zones):
+    return {
+        "recent_runs": runs[-20:],
+        "recent_laps": laps[-60:],
+        "pace_zones": pace_zones
+    }
+
+def build_prompt(context):
+    return f"""
+You are an elite marathon coach.
+
+You are given:
+- Recent Strava run data
+- Lap data (including splits and heart rate trends)
+- Current pace zones
+
+Your job:
+1. Evaluate training status
+2. Recommend ONE week of training:
+   - Monday: high intensity (tempo or intervals)
+   - Wednesday: easy run
+   - Saturday: long run
+3. Suggest adjustments ONLY to pace zones if justified by data
+
+Rules:
+- Do NOT overreact to single workouts
+- Make small incremental adjustments only
+- Prioritize aerobic development for sub-4 marathon
+- Keep structure stable
+
+OUTPUT FORMAT (strict):
+
+WEEKLY RECOMMENDATION:
+...
+
+RECOMMENDED MONDAY WORKOUT:
+...
+
+RECOMMENDED WEDNESDAY RUN:
+...
+
+RECOMMENDED SATURDAY RUN:
+...
+
+PACE ZONE UPDATES:
+...
+
+SUMMARY:
+...
+
+DATA:
+{context}
+"""
+
+def get_ai_recommendation(context):
+    response = client.chat.completions.create(
+        model="gpt-5.3-mini",
+        messages=[
+            {"role": "system", "content": "You are a world-class endurance running coach."},
+            {"role": "user", "content": build_prompt(context)}
+        ],
+        temperature=0.4
+    )
+
+    return response.choices[0].message.content
+# =========================
 # HELPER FUNCTIONS
 # =========================
 def ensure_headers(ws, headers):
@@ -182,6 +255,21 @@ def should_keep_activity(activity):
         return False
 
     return activity_type in ["Run", "WeightTraining", "Workout"]
+    
+def get_pace_zones(sheet):
+    ws = sheet.worksheet("Pace_Zones")
+    return ws.get_all_records()
+
+def write_ai_log(sheet, ai_output):
+    ws = sheet.worksheet("AI_Logs")
+
+    from datetime import datetime
+
+    ws.append_row([
+        datetime.now().strftime("%Y-%m-%d %H:%M"),
+        ai_output,
+        "", "", "", "", ""
+    ])
 
 # =========================
 # MAIN
@@ -198,12 +286,14 @@ def main():
     runs_ws = sheet.worksheet("Runs")
     strength_ws = sheet.worksheet("Strength")
     laps_ws = sheet.worksheet("Laps")
+    zones_ws = sheet.worksheet("Pace_Zones")
 
     ensure_headers(runs_ws, RUN_HEADERS)
     ensure_headers(strength_ws, STRENGTH_HEADERS)
     ensure_headers(laps_ws, LAP_HEADERS)
 
     existing_ids = get_existing_activity_ids(sheet)
+    pace_zones = get_pace_zones(sheet)
 
     run_rows = []
     strength_rows = []
@@ -241,8 +331,7 @@ def main():
                 a.get("moving_time"),
                 a.get("start_date")
             ])
-    
-        
+          
         for lap in laps:
             lap_rows.append([
                 activity_id,
@@ -255,8 +344,6 @@ def main():
                 lap.get("max_heartrate"),
             ])
 
-        
-
     # Append rows
     if run_rows:
         runs_ws.append_rows(run_rows, value_input_option="RAW")
@@ -266,6 +353,16 @@ def main():
         laps_ws.append_rows(lap_rows, value_input_option="RAW")
 
     print(f"Uploaded {len(rows)} activities")
+
+    context = build_ai_context(
+        runs=run_rows,
+        laps=lap_rows,
+        pace_zones=pace_zones
+    )
+
+    ai_output = get_ai_recommendation(context)
+
+    write_ai_log(sheet, ai_output)
 
 
 if __name__ == "__main__":
