@@ -97,10 +97,10 @@ def fetch_all_activities(token, after_timestamp=None):
         )
 
         # handle rate limit
-        if res.status_code == 429:
-            print("Rate limited. Sleeping 60s...")
-            time.sleep(60)
-            continue
+        #if res.status_code == 429:
+        #    print("Rate limited. Sleeping 2s...")
+        #    time.sleep(2)
+        #    continue
 
         res.raise_for_status()
 
