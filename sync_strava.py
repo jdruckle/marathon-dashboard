@@ -17,6 +17,8 @@ RAW_HEADERS = [
     "moving_time",
     "total_elevation_gain",
     "start_date",
+    "avg_hr",
+    "max_hr",
     "workout_type"
 ]
 
@@ -26,7 +28,9 @@ LAP_HEADERS = [
     "distance",
     "moving_time",
     "elapsed_time",
-    "start_date"
+    "start_date",
+    "avg_hr",
+    "max_hr"
 ]
 
 # =========================
@@ -204,6 +208,8 @@ def main():
             a.get("moving_time"),
             a.get("total_elevation_gain"),
             a.get("start_date"),
+            a.get("average_heartrate"),
+            a.get("max_heartrate"),
             workout_type
             ])
         
@@ -215,6 +221,8 @@ def main():
                 lap.get("moving_time"),
                 lap.get("elapsed_time"),
                 lap.get("start_date"),
+                lap.get("average_heartrate"),
+                lap.get("max_heartrate"),
             ])
 
         
