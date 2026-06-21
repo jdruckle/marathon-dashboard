@@ -7,6 +7,7 @@ import gspread
 from google.oauth2.service_account import Credentials
 from openai import OpenAI
 import os
+from datetime import datetime, timezone
 
 client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
 
@@ -70,27 +71,45 @@ def get_access_token():
 # STRAVA ACTIVITIES
 # =========================
 
-def fetch_all_activities(token, max_pages=10):
-    url = "https://www.strava.com/api/v3/athlete/activities"
+def fetch_all_activities(token, after_timestamp=None):
     headers = {"Authorization": f"Bearer {token}"}
 
+    page = 1
     all_activities = []
 
-    for page in range(1, max_pages + 1):
-        params = {
-            "per_page": 200,
-            "page": page
-        }
+    params_base = {"per_page": 200}
 
-        res = requests.get(url, headers=headers, params=params)
+    if after_timestamp:
+        params_base["after"] = after_timestamp
+
+    while True:
+        params = dict(params_base)
+        params["page"] = page
+
+        res = requests.get(
+            "https://www.strava.com/api/v3/athlete/activities",
+            headers=headers,
+            params=params
+        )
+
+        # handle rate limit
+        if res.status_code == 429:
+            print("Rate limited. Sleeping 60s...")
+            time.sleep(60)
+            continue
+
         res.raise_for_status()
 
-        batch = res.json()
+        data = res.json()
 
-        if not batch:
+        if not data:
             break
 
-        all_activities.extend(batch)
+        all_activities.extend(data)
+
+        page += 1
+
+        time.sleep(1.2)  # prevent burst limits
 
     return all_activities
 
@@ -271,16 +290,41 @@ def write_ai_log(sheet, ai_output):
         "", "", "", "", ""
     ])
 
+def get_last_sync_time(sheet):
+    ws = sheet.worksheet("Sync_State")
+    records = ws.get_all_records()
+
+    for row in records:
+        if row["key"] == "last_sync":
+            return row["value"]
+
+    # fallback if missing
+    return "1970-01-01T00:00:00"
+
+def to_unix(timestamp_str):
+    dt = datetime.fromisoformat(timestamp_str)
+    return int(dt.timestamp())
+    
+def update_sync_time(sheet):
+    ws = sheet.worksheet("Sync_State")
+
+    now = datetime.now(timezone.utc).isoformat()
+
+    records = ws.get_all_records()
+
+    for i, row in enumerate(records, start=2):  # row index starts at 2
+        if row["key"] == "last_sync":
+            ws.update_cell(i, 2, now)
+            print(f"Updated last_sync → {now}")
+            return
+
 # =========================
 # MAIN
 # =========================
 
 def main():
     print("Starting sync...")
-
-    token = get_access_token()
-    activities = fetch_all_activities(token)
-
+    
     sheet = connect_sheet()
 
     runs_ws = sheet.worksheet("Runs")
@@ -293,11 +337,15 @@ def main():
     ensure_headers(laps_ws, LAP_HEADERS)
 
     existing_ids = get_existing_activity_ids(sheet)
+    last_sync_str = get_last_sync_time(sheet)
     pace_zones = get_pace_zones(sheet)
 
     run_rows = []
     strength_rows = []
     lap_rows = []
+    last_sync_unix = to_unix(last_sync_str)
+    token = get_access_token()
+    activities = fetch_all_activities(token, after_timestamp=last_sync_unix)
     
     for a in activities:
         activity_id = str(a.get("id"))
