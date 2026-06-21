@@ -101,6 +101,39 @@ def connect_sheet():
 
 
 # =========================
+# DATA ANALYSIS
+# =========================
+def classify_workout(laps):
+    if not laps:
+        return "Unknown"
+
+    distances = [float(l.get("distance", 0)) for l in laps]
+    times = [float(l.get("moving_time", 0)) for l in laps]
+
+    total_laps = len(laps)
+
+    # Heuristic 1: long run
+    if total_laps <= 2 and sum(distances) > 15000:
+        return "Long Run"
+
+    # Heuristic 2: interval workout (many short structured laps)
+    if total_laps >= 4:
+        avg_lap_dist = sum(distances) / total_laps
+
+        if avg_lap_dist < 2000:
+            return "Interval Workout"
+
+    # Heuristic 3: threshold / tempo (medium structured laps)
+    if 2 <= total_laps <= 5:
+        return "Tempo / Threshold"
+
+    # Heuristic 4: single continuous effort
+    if total_laps <= 2:
+        return "Easy / Steady"
+
+    return "Mixed / Fartlek"
+
+# =========================
 # MAIN
 # =========================
 
@@ -125,7 +158,10 @@ def main():
     
         if activity_id in existing_ids:
             continue
-    
+
+        laps = fetch_laps(token, activity_id)
+        workout_type = classify_workout(laps)
+        
         rows.append([
             activity_id,
             a.get("name"),
@@ -133,11 +169,10 @@ def main():
             a.get("distance"),
             a.get("moving_time"),
             a.get("total_elevation_gain"),
-            a.get("start_date")
-        ])
-
-        laps = fetch_laps(token, activity_id)
-    
+            a.get("start_date"),
+            workout_type
+            ])
+        
         for lap in laps:
             lap_rows.append([
                 activity_id,
@@ -147,6 +182,8 @@ def main():
                 lap.get("elapsed_time"),
                 lap.get("start_date"),
             ])
+
+        
 
     # Append rows
     if rows:
