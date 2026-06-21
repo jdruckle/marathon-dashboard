@@ -9,7 +9,7 @@ from google.oauth2.service_account import Credentials
 # =========================
 # HEADER VARIABLES
 # =========================
-RAW_HEADERS = [
+RUN_HEADERS = [
     "id",
     "name",
     "type",
