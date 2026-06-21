@@ -22,6 +22,13 @@ RAW_HEADERS = [
     "workout_type"
 ]
 
+STRENGTH_HEADERS = [
+    "id",
+    "name",
+    "moving_time",
+    "start_date"
+]
+
 LAP_HEADERS = [
     "activity_id",
     "lap_index",
@@ -168,6 +175,14 @@ def ensure_headers(ws, headers):
     if existing != headers:
         ws.insert_row(headers, 1)
 
+def should_keep_activity(activity):
+    activity_type = activity.get("type")
+
+    if activity_type == "Walk":
+        return False
+
+    return activity_type in ["Run", "WeightTraining", "Workout"]
+
 # =========================
 # MAIN
 # =========================
@@ -180,38 +195,53 @@ def main():
 
     sheet = connect_sheet()
 
-    raw_ws = sheet.worksheet("Raw_Strava")
+    runs_ws = sheet.worksheet("Runs")
+    strength_ws = sheet.worksheet("Strength")
     laps_ws = sheet.worksheet("Laps")
 
-    ensure_headers(raw_ws, RAW_HEADERS)
+    ensure_headers(runs_ws, RUN_HEADERS)
+    ensure_headers(strength_ws, STRENGTH_HEADERS)
     ensure_headers(laps_ws, LAP_HEADERS)
 
     existing_ids = get_existing_activity_ids(sheet)
 
-    rows = []
+    run_rows = []
+    strength_rows = []
     lap_rows = []
     
     for a in activities:
         activity_id = str(a.get("id"))
+        activity_type = a.get("type")
     
         if activity_id in existing_ids:
+            continue
+        if activity_type == "Walk":
             continue
 
         laps = fetch_laps(token, activity_id)
         workout_type = classify_workout(laps)
-        
-        rows.append([
-            activity_id,
-            a.get("name"),
-            a.get("type"),
-            a.get("distance"),
-            a.get("moving_time"),
-            a.get("total_elevation_gain"),
-            a.get("start_date"),
-            a.get("average_heartrate"),
-            a.get("max_heartrate"),
-            workout_type
+
+        if activity_type == "Run":
+            run_rows.append([
+                activity_id,
+                a.get("name"),
+                a.get("type"),
+                a.get("distance"),
+                a.get("moving_time"),
+                a.get("total_elevation_gain"),
+                a.get("start_date"),
+                a.get("average_heartrate"),
+                a.get("max_heartrate"),
+                workout_type
             ])
+        elif activity_type in ["WeightTraining", "Workout"]:
+            strength_rows.append([
+                activity_id,
+                a.get("name"),
+                a.get("moving_time"),
+                a.get("start_date")
+            ])
+    
         
         for lap in laps:
             lap_rows.append([
@@ -228,8 +258,10 @@ def main():
         
 
     # Append rows
-    if rows:
-        raw_ws.append_rows(rows, value_input_option="RAW")
+    if run_rows:
+        runs_ws.append_rows(run_rows, value_input_option="RAW")
+    if strength_rows:
+        strength_ws.append_rows(strength_rows, value_input_option="RAW")
     if lap_rows:
         laps_ws.append_rows(lap_rows, value_input_option="RAW")
 
