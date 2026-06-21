@@ -6,6 +6,28 @@ from datetime import datetime
 import gspread
 from google.oauth2.service_account import Credentials
 
+# =========================
+# HEADER VARIABLES
+# =========================
+RAW_HEADERS = [
+    "id",
+    "name",
+    "type",
+    "distance",
+    "moving_time",
+    "total_elevation_gain",
+    "start_date",
+    "workout_type"
+]
+
+LAP_HEADERS = [
+    "activity_id",
+    "lap_index",
+    "distance",
+    "moving_time",
+    "elapsed_time",
+    "start_date"
+]
 
 # =========================
 # STRAVA AUTH
@@ -134,6 +156,15 @@ def classify_workout(laps):
     return "Mixed / Fartlek"
 
 # =========================
+# HELPER FUNCTIONS
+# =========================
+def ensure_headers(ws, headers):
+    existing = ws.row_values(1)
+
+    if existing != headers:
+        ws.insert_row(headers, 1)
+
+# =========================
 # MAIN
 # =========================
 
@@ -147,6 +178,9 @@ def main():
 
     raw_ws = sheet.worksheet("Raw_Strava")
     laps_ws = sheet.worksheet("Laps")
+
+    ensure_headers(raw_ws, RAW_HEADERS)
+    ensure_headers(laps_ws, LAP_HEADERS)
 
     existing_ids = get_existing_activity_ids(sheet)
 
