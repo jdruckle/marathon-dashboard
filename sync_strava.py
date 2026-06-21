@@ -114,7 +114,7 @@ def fetch_all_activities(token, after_timestamp=None):
     return all_activities
 
 def get_existing_activity_ids(sheet):
-    raw_ws = sheet.worksheet("Raw_Strava")
+    raw_ws = sheet.worksheet("Runs")
 
     # Get all values in first column (activity IDs)
     records = raw_ws.col_values(1)
