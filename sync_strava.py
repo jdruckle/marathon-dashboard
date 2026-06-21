@@ -29,7 +29,6 @@ def get_access_token():
     res.raise_for_status()
     return res.json()["access_token"]
 
-
 # =========================
 # STRAVA ACTIVITIES
 # =========================
@@ -58,7 +57,28 @@ def fetch_all_activities(token, max_pages=10):
 
     return all_activities
 
+def get_existing_activity_ids(sheet):
+    raw_ws = sheet.worksheet("Raw_Strava")
 
+    # Get all values in first column (activity IDs)
+    records = raw_ws.col_values(1)
+
+    # Skip header if you ever add one
+    return set(records)
+
+def fetch_laps(token, activity_id):
+    url = f"https://www.strava.com/api/v3/activities/{activity_id}/laps"
+
+    headers = {"Authorization": f"Bearer {token}"}
+
+    res = requests.get(url, headers=headers)
+
+    # Some activities (especially treadmill/manual) may not have laps
+    if res.status_code != 200:
+        return []
+
+    return res.json()
+    
 # =========================
 # GOOGLE SHEETS AUTH
 # =========================
@@ -93,12 +113,21 @@ def main():
     sheet = connect_sheet()
 
     raw_ws = sheet.worksheet("Raw_Strava")
+    laps_ws = sheet.worksheet("Laps")
+
+    existing_ids = get_existing_activity_ids(sheet)
 
     rows = []
-
+    lap_rows = []
+    
     for a in activities:
+        activity_id = str(a.get("id"))
+    
+        if activity_id in existing_ids:
+            continue
+    
         rows.append([
-            a.get("id"),
+            activity_id,
             a.get("name"),
             a.get("type"),
             a.get("distance"),
@@ -107,9 +136,23 @@ def main():
             a.get("start_date")
         ])
 
+        laps = fetch_laps(token, activity_id)
+    
+        for lap in laps:
+            lap_rows.append([
+                activity_id,
+                lap.get("lap_index"),
+                lap.get("distance"),
+                lap.get("moving_time"),
+                lap.get("elapsed_time"),
+                lap.get("start_date"),
+            ])
+
     # Append rows
     if rows:
         raw_ws.append_rows(rows, value_input_option="RAW")
+    if lap_rows:
+        laps_ws.append_rows(lap_rows, value_input_option="RAW")
 
     print(f"Uploaded {len(rows)} activities")
 
